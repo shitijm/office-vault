@@ -43,6 +43,48 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // GET credentials API
+    if (req.url === '/api/credentials' && req.method === 'GET') {
+        const filePath = path.join(__dirname, 'credentials.json');
+        fs.readFile(filePath, 'utf8', (err, data) => {
+            if (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to read credentials file' }));
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(data);
+        });
+        return;
+    }
+
+    // POST credentials API (updates the credentials.json file)
+    if (req.url === '/api/credentials' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => {
+            body += chunk.toString();
+        });
+        req.on('end', () => {
+            try {
+                const parsed = JSON.parse(body);
+                const filePath = path.join(__dirname, 'credentials.json');
+                fs.writeFile(filePath, JSON.stringify(parsed, null, 2), 'utf8', (err) => {
+                    if (err) {
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Failed to write credentials file' }));
+                        return;
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
+                });
+            } catch (e) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
+            }
+        });
+        return;
+    }
+
     // Serve static files
     let filePath = path.join(__dirname, req.url === '/' ? 'index.html' : req.url);
     const extname = path.extname(filePath);

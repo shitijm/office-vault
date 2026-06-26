@@ -47,12 +47,63 @@ document.addEventListener('DOMContentLoaded', () => {
         { item: 'SSID 4', type: 'Wi-Fi Network', login: 'SEPL-Lab', pass: 'Sp@rkl#2025' }
     ];
 
-    // Load or initialize credentials from Local Storage
-    let credentials = JSON.parse(localStorage.getItem('vault_credentials'));
-    if (!credentials) {
-        credentials = defaultCredentials;
+    let credentials = [];
+
+    // Save credentials to both LocalStorage and server if running locally
+    const saveCredentials = async (newCredentials) => {
+        credentials = newCredentials;
         localStorage.setItem('vault_credentials', JSON.stringify(credentials));
-    }
+
+        try {
+            const response = await fetch('/api/credentials', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(credentials)
+            });
+            if (!response.ok) {
+                console.warn('Failed to save credentials to server.');
+            }
+        } catch (err) {
+            console.warn('Server storage not reachable (e.g. running on static hosting like Netlify). Changes saved locally in your browser.', err);
+        }
+    };
+
+    // Load credentials from server (first choice) or fallback to localstorage
+    const loadCredentials = async () => {
+        try {
+            // First try reading from the local server or deployed credentials.json directly
+            const response = await fetch('/api/credentials');
+            if (response.ok) {
+                credentials = await response.json();
+                localStorage.setItem('vault_credentials', JSON.stringify(credentials));
+                return;
+            }
+        } catch (err) {
+            console.log('Server API not reachable, falling back to local files or localStorage.', err);
+        }
+
+        try {
+            // Fallback for static Netlify deploys: fetch the static credentials.json file
+            const response = await fetch('/credentials.json');
+            if (response.ok) {
+                credentials = await response.json();
+                localStorage.setItem('vault_credentials', JSON.stringify(credentials));
+                return;
+            }
+        } catch (err) {
+            console.log('Static credentials.json not found, loading from localStorage.', err);
+        }
+
+        // Final fallback: LocalStorage or hardcoded defaults
+        let local = JSON.parse(localStorage.getItem('vault_credentials'));
+        if (!local) {
+            local = defaultCredentials;
+            localStorage.setItem('vault_credentials', JSON.stringify(local));
+        }
+        credentials = local;
+    };
 
     // Mobile / Scanner state detection
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -73,7 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Navigation and Auth Handlers
-    const checkNavigationState = () => {
+    const checkNavigationState = async () => {
+        await loadCredentials();
         if (sessionStorage.getItem('vault_authenticated') === 'true') {
             showDashboard();
         } else if (isScannedUrl || isMobile) {
@@ -198,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    addCredForm.addEventListener('submit', (e) => {
+    addCredForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const updatedCred = {
             item: credItemInput.value.trim(),
@@ -215,7 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast("Credential updated successfully!");
         }
 
-        localStorage.setItem('vault_credentials', JSON.stringify(credentials));
+        await saveCredentials(credentials);
         
         // Reset and hide
         addCredForm.reset();
@@ -316,10 +368,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     addCredModal.classList.remove('hidden');
                 });
 
-                card.querySelector('.delete-btn').addEventListener('click', () => {
+                card.querySelector('.delete-btn').addEventListener('click', async () => {
                     if (confirm(`Are you sure you want to delete ${cred.item}?`)) {
                         credentials.splice(index, 1);
-                        localStorage.setItem('vault_credentials', JSON.stringify(credentials));
+                        await saveCredentials(credentials);
                         renderCredentials();
                         showToast("Credential deleted successfully!");
                     }
