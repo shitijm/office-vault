@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureVault — Credentials Hub</title>
+    <meta name="description" content="A highly secure, sleek dashboard to access local workspace credentials.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <!-- QRCode library for generating dynamic scanner code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="glow-bg"></div>
+
+    <!-- 1. QR Landing Screen (Visible Initially on Desktop) -->
+    <div id="qr-landing-container" class="auth-card glass">
+        <div class="card-header">
+            <div class="logo-shield">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h2>Scan to Access Vault</h2>
+            <p>Scan the QR code with your phone to log in and view credentials</p>
+        </div>
+
+        <div class="qr-landing-wrapper">
+            <div id="landing-qr"></div>
+            <div class="qr-loading">Generating secure link...</div>
+        </div>
+
+        <div class="address-box">
+            <span class="address-value" id="landing-url">Detecting URL...</span>
+        </div>
+
+        <button id="bypass-qr-btn" class="text-link-btn">Unlock on this device</button>
+    </div>
+
+    <!-- 2. Passkey / Login Screen (Shown after scan or bypass) -->
+    <div id="login-container" class="auth-card glass hidden">
+        <!-- Close button to exit back to QR screen -->
+        <button id="close-login-btn" class="close-card-btn" title="Back to Scanner">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+
+        <div class="card-header">
+            <div class="logo-shield" id="login-shield">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h2 id="login-title">Enter Vault Passkey</h2>
+            <p id="login-subtitle">Enter your 4-digit passcode to reveal credentials</p>
+        </div>
+        <form id="login-form">
+            <div class="input-wrapper">
+                <input type="password" id="passkey-input" placeholder="••••" maxlength="4" autocomplete="current-password" required>
+                <div class="input-focus-border"></div>
+            </div>
+        </form>
+        <p id="error-msg" class="error-text"></p>
+        
+        <div class="auth-actions-row">
+            <button id="toggle-admin-mode-btn" class="text-link-btn">Login as Admin</button>
+            <span class="auth-separator">|</span>
+            <button id="back-to-qr-btn" class="text-link-btn">Show QR Code</button>
+        </div>
+    </div>
+
+    <!-- 3. Main App Dashboard (Shown after successful passcode entry) -->
+    <div id="dashboard-container" class="app-container hidden">
+        <header class="dashboard-header">
+            <div class="header-left">
+                <div class="logo-row">
+                    <span class="logo-dot"></span>
+                    <h1>SecureVault</h1>
+                    <span class="role-badge" id="role-badge">User</span>
+                </div>
+                <p class="subtitle">Workspace Credentials & Access Keys</p>
+            </div>
+            <div class="header-right">
+                <button id="lock-btn" class="icon-btn-secondary" title="Lock Vault">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Credentials list -->
+            <section class="credentials-section">
+                <div class="section-title-row">
+                    <h3>Available Credentials</h3>
+                    <div class="title-actions">
+                        <span class="count-badge" id="cred-count">0</span>
+                        <button id="add-cred-trigger" class="add-btn-primary hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                            Add
+                        </button>
+                    </div>
+                </div>
+                <div id="credentials-list" class="credentials-list">
+                    <!-- Cards populated by app.js -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Dialog for adding / editing credentials -->
+    <div id="add-cred-modal" class="modal-overlay hidden">
+        <div class="modal-card glass">
+            <div class="modal-header">
+                <h3 id="modal-title">Add New Credential</h3>
+                <button id="close-modal-btn" class="close-card-btn">&times;</button>
+            </div>
+            <form id="add-cred-form">
+                <div class="form-group">
+                    <label for="cred-item">Item / Service Name</label>
+                    <input type="text" id="cred-item" placeholder="e.g. Router Admin, GitHub" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="cred-type">Type</label>
+                    <input type="text" id="cred-type" placeholder="e.g. Device, Wi-Fi Network, Email" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="cred-login">Username / Login ID</label>
+                    <input type="text" id="cred-login" placeholder="e.g. SEPL-Lab, conference-one@sparkl.me" required autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="cred-pass">Password</label>
+                    <input type="text" id="cred-pass" placeholder="Password value" required autocomplete="off">
+                </div>
+                <button type="submit" class="submit-btn" id="modal-submit-btn">Save Credential</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification for Clipboards -->
+    <div id="toast" class="toast hidden">Copied to clipboard!</div>
+
+    <script src="app.js"></script>
+</body>
+</html>
